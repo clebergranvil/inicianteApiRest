@@ -1,0 +1,469 @@
+unit Unit2;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, System.JSON, System.StrUtils, System.RegularExpressions;
+
+type
+  TForm2 = class(TForm)
+    Button1: TButton;
+    Memo1: TMemo;
+    Button2: TButton;
+    Button3: TButton;
+    procedure Button1Click(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+  private
+    function F_InsertRetornaNomeCampo(
+      const Script: string): TArray<string>;
+    function F_RetornaNomeTabela(const SQL: string): string;
+    function F_InsertRetornaValorCampo(const Script: string): TArray<string>;
+    function F_RetornaTipoScript(const SQL: string): string;
+    function F_UpdateRetornaValor(const Script: string): TArray<string>;
+    function F_UpdateRetornaNomeCampo(const Script: string): TArray<string>;
+    function F_UpdateValoresWhere(const Script: string): TArray<string>;
+    function F_UpdateCampoWhere(const Script: string): TArray<string>;
+    function ExtractWhereFieldOperatorsFromUpdateScript(const Script: string): TArray<string>;
+    function condi(const Script: string): TArray<string>;
+
+
+
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form2: TForm2;
+
+implementation
+
+{$R *.dfm}
+
+function TForm2.F_RetornaTipoScript(const SQL: string): string;
+begin
+  if Pos('DELETE', UpperCase(SQL)) = 1 then
+    Result := 'DELETE'
+  else if Pos('INSERT', UpperCase(SQL)) = 1 then
+    Result := 'INSERT'
+  else if Pos('UPDATE', UpperCase(SQL)) = 1 then
+    Result := 'UPDATE'
+  else
+    Result := '';
+end;
+
+function TForm2.F_RetornaNomeTabela(const SQL: string): string;
+var
+  PosTableNameStartx: Integer;
+  PosTableNameEnds: Integer;
+  ss: string;
+begin
+  ss := F_RetornaTipoScript(SQL);
+
+  if ss = 'INSERT' then
+  begin
+    PosTableNameStartx := Pos('INTO', UpperCase(SQL)) + 4;
+    PosTableNameEnds := Pos('(', SQL);
+  end
+  else if ss = 'DELETE' then
+  begin
+    PosTableNameStartx := Pos('FROM', UpperCase(SQL)) + 4;
+    PosTableNameEnds := Pos(' ', SQL, PosTableNameStartx);
+  end
+  else if ss = 'UPDATE' then
+  begin
+    PosTableNameStartx := Pos('UPDATE', UpperCase(SQL)) + 6;
+    PosTableNameEnds := Pos('SET', UpperCase(SQL));
+  end
+  else
+  begin
+    Result := '';
+    Exit;
+  end;
+
+  if (PosTableNameStartx > 0) and (PosTableNameEnds > PosTableNameStartx) then
+  begin
+    Result := Trim(Copy(SQL, PosTableNameStartx, PosTableNameEnds - PosTableNameStartx));
+  end
+  else
+    Result := '';
+end;
+
+function TForm2.F_InsertRetornaNomeCampo(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+begin
+  RegEx := TRegEx.Create('INSERT INTO .*?\((.*?)\)', [roIgnoreCase]);
+  Matches := RegEx.Matches(Script);
+
+  if Matches.Count > 0 then
+  begin
+    Match := Matches[0];
+    Result := Match.Groups[1].Value.Split([',']);
+  end
+  else
+    SetLength(Result, 0);
+end;
+
+function TForm2.F_InsertRetornaValorCampo(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+begin
+  RegEx := TRegEx.Create('VALUES \((.*?)\);', [roIgnoreCase]);
+  Matches := RegEx.Matches(Script);
+
+  if Matches.Count > 0 then
+  begin
+    Match := Matches[0];
+    Result := TRegEx.Split(Match.Groups[1].Value, ',(?![^(]*\))');
+    for var i := 0 to High(Result) do
+      Result[i] := Trim(Result[i]);
+  end
+  else
+    SetLength(Result, 0);
+end;
+
+
+
+
+
+
+procedure TForm2.Button1Click(Sender: TObject);
+var
+  txt, tt: TStringList;
+  linha: string;
+  Fields: TArray<string>;
+  Field, l, v: string;
+begin
+
+  txt := TStringList.Create;
+  txt.LoadFromFile('C:\Users\Cleber\Downloads\SCRIPTS.txt');
+
+  tt := TStringList.Create;
+
+  for linha in txt do
+  begin
+    v := '';
+    l := '';
+
+
+    
+  
+    if F_RetornaTipoScript(linha) = 'UPDATE' then
+    begin
+      Fields := condi(linha);
+      for Field in Fields do
+        v := v + ' - ' + Field;
+
+      tt.Add(v);
+      tt.Add(linha);
+      tt.Add(' ########### ');
+    end;
+  
+  
+//    if GetScriptType(linha) = 'UPDATE' then
+//    begin
+//      Fields := ExtractFieldNamesFromUpdateScript(linha);
+//      for Field in Fields do
+//        v := v + ' - ' + Field;
+//
+//      Fields := ExtractFieldValuesFromUpdateScript(linha);
+//      for Field in Fields do
+//        l := l + ' - ' + Field;
+//        
+//  
+//      tt.Add(l);
+//      tt.Add(linha);
+//      tt.Add(v);
+//      tt.Add(linha);
+//      tt.Add(' ########### ');
+//    end;
+
+  
+
+  
+//    if GetScriptType(linha) = 'INSERT' then
+//    begin
+//      Fields := ExtractFieldsFromInsertScript(linha);
+//      for Field in Fields do
+//        l := l + Field;
+//
+//      Fields := ExtractValores(linha);
+//      for Field in Fields do
+//        v := v + ' - ' + Field;
+//  
+//     // tt.Add(l + ' - - ' + v + ' -- ' + linha);
+//      tt.Add(v + ' -- ' + linha);
+//    end;
+  end;
+  
+  tt.SaveToFile('C:\Users\Cleber\Downloads\tt.txt');
+  Memo1.Text := tt.Text;
+end;
+
+
+
+
+function TForm2.F_UpdateRetornaValor(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+begin
+  RegEx := TRegEx.Create('SET\s(.*?)\sWHERE', [roIgnoreCase]);
+  Matches := RegEx.Matches(Script);
+
+  if Matches.Count > 0 then
+  begin
+    Match := Matches[0];
+    Result := TRegEx.Split(Match.Groups[1].Value, ',(?![^(]*\))');
+    for var i := 0 to High(Result) do
+      Result[i] := Trim(Result[i]);
+  end
+  else
+    SetLength(Result, 0);
+end;
+
+function TForm2.F_UpdateRetornaNomeCampo(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+begin
+  RegEx := TRegEx.Create('SET\s(.*?)\sWHERE', [roIgnoreCase]);
+  Matches := RegEx.Matches(Script);
+
+  if Matches.Count > 0 then
+  begin
+    Match := Matches[0];
+    Result := TRegEx.Split(Match.Groups[1].Value, ',(?![^(]*\))');
+    for var i := 0 to High(Result) do
+      Result[i] := Trim(Result[i].Split(['='])[1]);
+  end
+  else
+    SetLength(Result, 0);
+end;
+
+function TForm2.F_UpdateValoresWhere(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+  WhereClause: string;
+  FieldValues: TArray<string>;
+  I: Integer;
+begin
+  RegEx := TRegEx.Create('WHERE\s(.*?);', [roIgnoreCase]);
+  Matches := RegEx.Matches(Script);
+
+  if Matches.Count > 0 then
+  begin
+    Match := Matches[0];
+    WhereClause := Match.Groups[1].Value;
+
+    // Remover espaços em branco desnecessários entre parênteses
+    WhereClause := TRegEx.Replace(WhereClause, '\s+(?=[^\(\)]*\))', '');
+
+    // Extrair os valores dos campos da condição WHERE
+    RegEx := TRegEx.Create('(?<=^|\bAND\b|\bOR\b)\s*(\w+)\s*([<>=]+|\bLIKE\b)\s*(.+?)(?=\bAND\b|\bOR\b|$)', [roIgnoreCase]);
+    Matches := RegEx.Matches(WhereClause);
+
+    SetLength(FieldValues, Matches.Count);
+
+    for I := 0 to Matches.Count - 1 do
+    begin
+      FieldValues[I] := Trim(Matches[I].Groups[3].Value);
+    end;
+  end
+  else
+    SetLength(FieldValues, 0);
+
+  Result := FieldValues;
+end;
+
+
+
+procedure TForm2.Button2Click(Sender: TObject);
+var
+  vArquivo: TStringList;
+  vObjetoJson, vObjetoColunas: TJSONObject;
+  vTipo: string;
+  vLinha: string;
+  Fields, vValores: TArray<string>;
+  Field, l, v: string;
+  I: Integer;
+begin
+  try
+    vArquivo := TStringList.Create;
+    vArquivo.LoadFromFile('C:\Users\Cleber\Downloads\SCRIPTS.txt');
+
+    for vLinha in vArquivo do
+    begin
+      vTipo := F_RetornaTipoScript(vlinha);
+      vObjetoJson := TJSONObject.Create;
+
+      vObjetoJson.AddPair('tabela', F_RetornaNomeTabela(vlinha));
+      vObjetoJson.AddPair('tipo', vTipo);
+
+      if vTipo = 'INSERT' then
+      begin
+        vObjetoColunas := TJSONObject.Create;
+        Fields := F_InsertRetornaNomeCampo(vLinha);
+        vValores := F_InsertRetornaValorCampo(vLinha);
+
+        if Length(Fields) <> Length(vValores) then
+          raise Exception.Create('Erro quantidade de campos divergentes da quantidade de valores!');
+
+        for I := 0 to Length(Fields) - 1 do
+        begin
+          vObjetoColunas.AddPair(Fields[I], vValores[I]);
+        end;
+
+        vObjetoJson.AddPair('colunasValores', vObjetoColunas);
+      end else
+      if vTipo = 'UPDATE' then
+      begin
+        vObjetoColunas := TJSONObject.Create;
+        Fields := F_UpdateRetornaNomeCampo(vLinha);
+        vValores := F_UpdateRetornaValor(vLinha);
+
+        if Length(Fields) <> Length(vValores) then
+          raise Exception.Create('Erro quantidade de campos divergentes da quantidade de valores!');
+
+        for I := 0 to Length(Fields) - 1 do
+        begin
+          vObjetoColunas.AddPair(Fields[I], vValores[I]);
+        end;
+        vObjetoJson.AddPair('colunasValores', vObjetoColunas);
+
+
+        vObjetoColunas := TJSONObject.Create;
+        Fields := F_UpdateCampoWhere(vLinha);
+        vValores := F_UpdateValoresWhere(vLinha);
+
+        if Length(Fields) <> Length(vValores) then
+          raise Exception.Create('Erro quantidade de campos do where divergentes da quantidade de valores!');
+
+        for I := 0 to Length(Fields) - 1 do
+        begin
+          vObjetoColunas.AddPair(Fields[I], vValores[I]);
+        end;
+
+        vObjetoJson.AddPair('colunasValoresWhere', vObjetoColunas);
+      end;
+
+      vObjetoJson.AddPair('script', vlinha);
+      vTipo := vObjetoJson.ToString();
+      Memo1.Lines.Add(vObjetoJson.ToString);
+    end;
+  except on E: Exception do
+  begin
+    ShowMessage('Erro' + E.Message + vLinha);
+  end;
+  end;
+
+
+end;
+
+function TForm2.F_UpdateCampoWhere(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+  WhereClause: string;
+  FieldNames: TArray<string>;
+  I: Integer;
+begin
+  RegEx := TRegEx.Create('WHERE\s(.*?);', [roIgnoreCase]);
+  Matches := RegEx.Matches(Script);
+
+  if Matches.Count > 0 then
+  begin
+    Match := Matches[0];
+    WhereClause := Match.Groups[1].Value;
+
+    // Remover espaços em branco desnecessários entre parênteses
+    WhereClause := TRegEx.Replace(WhereClause, '\s+(?=[^\(\)]*\))', '');
+
+    // Extrair os nomes dos campos da cláusula WHERE
+    RegEx := TRegEx.Create('(\w+)\s*([<>=]+|\bLIKE\b)\s*.+?(?=\bAND\b|\bOR\b|$)', [roIgnoreCase]);
+    Matches := RegEx.Matches(WhereClause);
+
+    SetLength(FieldNames, Matches.Count);
+
+    for I := 0 to Matches.Count - 1 do
+    begin
+      FieldNames[I] := Trim(Matches[I].Groups[1].Value);
+    end;
+  end
+  else
+    SetLength(FieldNames, 0);
+
+  Result := FieldNames;
+end;
+
+function TForm2.ExtractWhereFieldOperatorsFromUpdateScript(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+  WhereClause: string;
+  FieldOperators: TArray<string>;
+  I: Integer;
+begin
+  RegEx := TRegEx.Create('WHERE\s(.*?);', [roIgnoreCase]);
+  Matches := RegEx.Matches(Script);
+
+  if Matches.Count > 0 then
+  begin
+    Match := Matches[0];
+    WhereClause := Match.Groups[1].Value;
+
+    // Remover espaços em branco desnecessários entre parênteses
+    WhereClause := TRegEx.Replace(WhereClause, '\s+(?=[^\(\)]*\))', '');
+
+    // Extrair os operadores dos campos da condição WHERE
+    RegEx := TRegEx.Create('(?<=^|\bAND\b|\bOR\b)\s*(\w+)\s*([<>=]+|\bLIKE\b)\s*.+?(?=\bAND\b|\bOR\b|$)', [roIgnoreCase]);
+    Matches := RegEx.Matches(WhereClause);
+
+    SetLength(FieldOperators, Matches.Count);
+
+    for I := 0 to Matches.Count - 1 do
+    begin
+      FieldOperators[I] := Trim(Matches[I].Groups[2].Value);
+    end;
+  end
+  else
+    SetLength(FieldOperators, 0);
+
+  Result := FieldOperators;
+end;
+
+function TForm2.condi(const Script: string): TArray<string>;
+var
+  RegEx: TRegEx;
+  Matches: TMatchCollection;
+  Match: TMatch;
+  LogicalOperators: TArray<string>;
+  I: Integer;
+begin
+  // Extrair os operadores lógicos (AND e OR) da cláusula WHERE
+  RegEx := TRegEx.Create('(?:^|\()\s*(\bAND\b|\bOR\b)\s*(?=\(|\bAND\b|\bOR\b|$)', [roIgnoreCase]);
+//  Matches := RegEx.Matches(WhereClause);
+
+  SetLength(LogicalOperators, Matches.Count);
+
+  for I := 0 to Matches.Count - 1 do
+  begin
+    LogicalOperators[I] := Trim(Matches[I].Groups[1].Value);
+  end;
+
+  Result := LogicalOperators;
+end;
+
+end.
